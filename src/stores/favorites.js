@@ -38,7 +38,7 @@ export const useFavStore = defineStore('favorites', () => {
         },
 
         removeSeries: async (accountId, sessionId, seriesId) => {
-            const response = await FavoritesService.removeFavoriteSeries(seriesId)
+            const response = await FavoritesService.removeFavoriteSeries(accountId, sessionId,seriesId)
             if (response) {
                 mutations.updateSeries(accountId, sessionId)
             }

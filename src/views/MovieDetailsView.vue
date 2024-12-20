@@ -21,6 +21,8 @@ onMounted(async () => {
   await movieStore.getMovieDetail(props.movieId);
 });
 
+
+
 const hasMovie = computed(() => {
   return favStore.state.movies?.results?.some((movie) => movie.id == props.movieId);
 });
@@ -57,7 +59,7 @@ const progressStyle = computed(() => {
 </script>
 
 <template>
-  <div v-if="movieStore.currentMovie.title" class="main">
+  <div v-if="movieStore.currentMovie?.title" class="main">
     <div class="content">
       <div class="bg"
         :style="(movieStore.currentMovie.images)? `background-image: url('https://image.tmdb.org/t/p/original/${movieStore.currentMovie.images.backdrops[0].file_path}')` : ''">
@@ -105,7 +107,7 @@ const progressStyle = computed(() => {
   <div class="additional">
     <h2>Elenco</h2>
     <div class="ti-da">
-      <div v-if="movieStore.currentMovie.credits" class="ti-da-ct" v-for="i, index in movieStore.currentMovie.credits.cast" :key="index">
+      <div v-if="movieStore.currentMovie?.credits" class="ti-da-ct" v-for="i, index in movieStore.currentMovie.credits.cast" :key="index">
         <img v-if="i.profile_path" :src="`https://image.tmdb.org/t/p/w92${i.profile_path}`" :alt="i.name" />
         <img v-else :src="`https://via.placeholder.com/92x46.png?text=${i.name}`" :alt="i.name" />
 
@@ -117,7 +119,7 @@ const progressStyle = computed(() => {
     </div>
     <h2>Elenco</h2>
     <div class="ti-da">
-      <div v-if="movieStore.currentMovie.production_companies" class="ti-da-ct"  v-for="i, index in movieStore.currentMovie.production_companies" :key="index">
+      <div v-if="movieStore.currentMovie?.production_companies" class="ti-da-ct"  v-for="i, index in movieStore.currentMovie.production_companies" :key="index">
         <img v-if="i.logo_path" :src="`https://image.tmdb.org/t/p/w92${i.logo_path}`" :alt="i.name" />
         <img v-else :src="`https://via.placeholder.com/92x46.png?text=${i.name}`" :alt="i.name" />
 

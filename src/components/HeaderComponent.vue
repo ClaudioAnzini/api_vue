@@ -4,8 +4,13 @@ import { RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { info } from '@/plugins/axios';
 import defaultUser from '@/assets/icons/default_user.svg';
-
+import api from '@/plugins/axios';
 import { useFavStore } from '@/stores/favorites';
+
+const searchInput = ref('');
+const searchResults = ref([]);
+const isSearchPreviewVisible = ref(false);
+const searchMenuRef = ref(null);
 
 const favStore = useFavStore();
 
@@ -18,6 +23,39 @@ const userMenuRef = ref(null);
 const favoritesMenuRef = ref(null);
 
 const loginProcess = ref(false);
+
+async function search(query) {
+    if (!query) {
+        searchResults.value = [];
+        return;
+    }
+
+    try {
+        const response = await api.get(
+            `/search/multi`,
+            {
+                params: {
+                    query: query,
+                    language: 'pt-BR',
+                },
+            }
+        );
+        searchResults.value = response.data.results;
+    } catch (error) {
+        console.error('Erro ao buscar resultados:', error);
+    }
+}
+
+function handleSearchInput(event) {
+    const query = event.target.value;
+    searchInput.value = query;
+    search(query);
+    isSearchPreviewVisible.value = !!query;
+}
+
+function closeSearchPreview() {
+    isSearchPreviewVisible.value = false;
+}
 
 function toggleUserMenu() {
     isUserMenuOpen.value = !isUserMenuOpen.value;
@@ -52,10 +90,11 @@ function handleClickOutside(event) {
         userMenuRef.value &&
         !userMenuRef.value.contains(event.target) &&
         favoritesMenuRef.value &&
-        !favoritesMenuRef.value.contains(event.target)
+        !favoritesMenuRef.value.contains(event.target) 
     ) {
         closeUserMenu();
-        closeFavoritesMenu();
+        closeFavoritesMenu();   
+        closeSearchPreview();
     }
 }
 onMounted(() => {
@@ -79,26 +118,29 @@ onUnmounted(() => {
                 </RouterLink>
             </div>
         </nav>
-        <nav class="akd-ds-nav">
-            <div class="user-things">
-                <RouterLink class="user-things-a" href="/cart">
-                    <span class="icon">
-                        <p>Filmes</p>
-                    </span>
-                </RouterLink>
-                <RouterLink class="user-things-a" href="/cart">
-                    <span class="icon">
-                        <p>Séries</p>
-                    </span>
-                </RouterLink>
-            </div>
-        </nav>
         <nav class="search-nav">
             <div class="search-div">
-                <input class="search-input" type="text" placeholder="Procure filmes e series">
+                <input class="search-input" type="text" placeholder="Procure filmes e series" v-model="searchInput"
+                    @input="handleSearchInput">
                 <span class="vr"></span>
                 <div class="search-icon-div">
                     <img src="@/assets/icons/search.svg">
+                </div>
+
+                <div v-if="isSearchPreviewVisible && searchResults.length" class="search-preview">
+                    <ul class="search-results">
+                        <li v-for="result in searchResults" :key="result.id" class="search-result-item">
+                            <RouterLink :to="result.media_type === 'movie' ? `/movie/${result.id}` : `/tv/${result.id}`"
+                                class="result-link">
+                                <img :src="result.poster_path ? `https://image.tmdb.org/t/p/w92${result.poster_path}` : ''"
+                                    alt="Poster" class="result-poster" />
+                                <span class="result-title">
+                                    {{ result.title || result.name }}
+                                    <small>({{ result.media_type === 'movie' ? 'Filme' : 'Série' }})</small>
+                                </span>
+                            </RouterLink>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </nav>
@@ -112,11 +154,24 @@ onUnmounted(() => {
                         <div v-if="authStore.getters.isAuthenticated">
                             <h2>Favoritos</h2>
                             <ul class="fav-ul">
+                                <h3>Filmes</h3>
                                 <li v-for="movie in favStore.state.movies.results" :key="movie.id">
                                     <RouterLink class="fav-item" :to="`/movie/${movie.id}`">
                                         <img :src="`${info.apiAvatar}/t/p/w500${movie.poster_path}`" alt="Movie poster">
                                         <p>{{ movie.title }}</p>
-                                        <button @click="favStore.actions.removeMovie(authStore.getters.user.id, authStore.state.token, movie.id)">
+                                        <button
+                                            @click="favStore.actions.removeMovie(authStore.getters.user.id, authStore.state.token, movie.id)">
+                                            <span class="material-symbols-outlined">delete</span>
+                                        </button>
+                                    </RouterLink>
+                                </li>
+                                <h3>Séries</h3>
+                                <li v-for="movie in favStore.state.series.results" :key="movie.id">
+                                    <RouterLink class="fav-item" :to="`/tv/${movie.id}`">
+                                        <img :src="`${info.apiAvatar}/t/p/w500${movie.poster_path}`" alt="Movie poster">
+                                        <p>{{ movie.name }}</p>
+                                        <button
+                                            @click="favStore.actions.removeSeries(authStore.getters.user.id, authStore.state.token, movie.id)">
                                             <span class="material-symbols-outlined">delete</span>
                                         </button>
                                     </RouterLink>
@@ -134,18 +189,9 @@ onUnmounted(() => {
                             <img :src="(authStore.getters.user.avatar.tmdb.avatar_path) ? `${info.apiAvatar}/t/p/w500${authStore.getters.user.avatar.tmdb.avatar_path}` : defaultUser"
                                 alt="User picture">
                             <h2>Olá, {{ authStore.getters.user.username }}</h2>
-                            <div class="ur-dsh-c">
-                                <RouterLink class="ur-dsh-c-a" to="/">
-                                    <p>Gerenciar meu perfil</p>
-                                </RouterLink>
-                            </div>
                         </div>
                         <div class="ur-ac">
                             <div class="ur-dsh-b">
-                                <button @click="toggleFavoritesMenu" class="ur-dsh-b-a">
-                                    <span class="icon material-symbols-outlined">favorite</span>
-                                    <p>Favoritos</p>
-                                </button>
                                 <button @click="handleLogout" class="ur-dsh-b-a">
                                     <p>Sair</p>
                                 </button>
@@ -174,6 +220,61 @@ onUnmounted(() => {
     </header>
 </template>
 <style scoped>
+.search-preview {
+    position: absolute;
+    top: 60px;
+    background-color: white;
+    border-radius: 7px;
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.search-results {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    gap: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.search-result-item:hover {
+    background-color: #f0f0f0;
+}
+
+.result-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: black;
+    gap: 10px;
+    width: 100%;
+}
+
+.result-poster {
+    width: 50px;
+    height: 75px;
+    object-fit: cover;
+    border-radius: 5px;
+    background-color: #ccc;
+}
+
+.result-title {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+h3 {
+    margin: 0;
+}
 
 .fav-ul {
     list-style: none;
@@ -590,11 +691,6 @@ header {
         width: 38px;
         height: 38px;
         margin-left: 0;
-    }
-
-    .search-nav .user-things,
-    .user-things-a {
-        display: none;
     }
 }
 </style>

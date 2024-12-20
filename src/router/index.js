@@ -23,6 +23,12 @@ const routes = [
     props: true,
   },
   {
+    path: '/tv/:tvId',
+    name: 'TvDetails',
+    component: () => import('@/views/TvDetailsView.vue'),
+    props: true,
+  },
+  {
     path: '/auth/callback',
     name: 'AuthCallback',
     component: () => import('@/views/Auth/Callback.vue'),
