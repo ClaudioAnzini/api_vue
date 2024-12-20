@@ -1,33 +1,69 @@
 <script setup>
-import { ref, onMounted, onUnmounted} from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+import { info } from '@/plugins/axios';
+import defaultUser from '@/assets/icons/default_user.svg';
 
-function t(i) {
-    return i.toLowerCase().charAt(0).toUpperCase() + i.slice(1).toLowerCase();
-}
-function ft(i) {
-    return i.charAt(0).toUpperCase() + i.slice(1).toLowerCase();
-}
+import { useFavStore } from '@/stores/favorites';
+
+const favStore = useFavStore();
+
+const authStore = useAuthStore();
 
 const isUserMenuOpen = ref(false);
+const isFavoritesMenuOpen = ref(false);
+
 const userMenuRef = ref(null);
+const favoritesMenuRef = ref(null);
+
+const loginProcess = ref(false);
 
 function toggleUserMenu() {
     isUserMenuOpen.value = !isUserMenuOpen.value;
+    if (isUserMenuOpen.value) closeFavoritesMenu();
+}
+
+function toggleFavoritesMenu() {
+    isFavoritesMenuOpen.value = !isFavoritesMenuOpen.value;
+    if (isFavoritesMenuOpen.value) closeUserMenu();
 }
 
 function closeUserMenu() {
     isUserMenuOpen.value = false;
 }
 
-function handleClickOutside(event) {
-    if (userMenuRef.value && !userMenuRef.value.contains(event.target)) {
-        closeUserMenu();
-    }
+function closeFavoritesMenu() {
+    isFavoritesMenuOpen.value = false;
 }
 
+function handleLogout() {
+    authStore.mutations.logout();
+    closeUserMenu();
+}
+
+function handleLogin() {
+    authStore.actions.login();
+    loginProcess.value = true;
+}
+
+function handleClickOutside(event) {
+    if (
+        userMenuRef.value &&
+        !userMenuRef.value.contains(event.target) &&
+        favoritesMenuRef.value &&
+        !favoritesMenuRef.value.contains(event.target)
+    ) {
+        closeUserMenu();
+        closeFavoritesMenu();
+    }
+}
 onMounted(() => {
     document.addEventListener('click', handleClickOutside);
+    if (localStorage.getItem('user')) {
+        favStore.mutations.updateMovies(JSON.parse(localStorage.getItem('user')).id, localStorage.getItem('token'));
+        favStore.mutations.updateSeries(JSON.parse(localStorage.getItem('user')).id, localStorage.getItem('token'));
+    }
 });
 
 onUnmounted(() => {
@@ -39,106 +75,98 @@ onUnmounted(() => {
     <header>
         <nav class="dp-rm">
             <div>
-                <RouterLink class="logo" href="/">
+                <RouterLink class="logo" to="/">
+                </RouterLink>
+            </div>
+        </nav>
+        <nav class="akd-ds-nav">
+            <div class="user-things">
+                <RouterLink class="user-things-a" href="/cart">
+                    <span class="icon">
+                        <p>Filmes</p>
+                    </span>
+                </RouterLink>
+                <RouterLink class="user-things-a" href="/cart">
+                    <span class="icon">
+                        <p>Séries</p>
+                    </span>
                 </RouterLink>
             </div>
         </nav>
         <nav class="search-nav">
             <div class="search-div">
-                <input class="search-input" type="text" placeholder="Procure produtos e muito mais...">
+                <input class="search-input" type="text" placeholder="Procure filmes e series">
                 <span class="vr"></span>
                 <div class="search-icon-div">
                     <img src="@/assets/icons/search.svg">
                 </div>
             </div>
-            <div class="user-things">
-                <RouterLink class="user-things-a" href="/cart">
-                <span class="icon">
-                    <img src="@/assets/icons/grid.svg">
-                    <p>Meus Anúncios</p>
-                </span>
-                </RouterLink>
-                <RouterLink class="user-things-a" href="/cart">
-                <span class="icon">
-                    <img src="@/assets/icons/chat.svg">
-                    <p>Conversas</p>
-                </span>
-                </RouterLink>
-                <RouterLink class="user-things-a" href="/cart">
-                <span class="icon">
-                    <img src="@/assets/icons/notifications.svg">
-                    <p>Notificações</p>
-                </span>
-                </RouterLink>
-            </div>
         </nav>
         <nav class="button-nav sort-buttons" ref="userMenuRef">
             <div class="user-things">
-                <RouterLink class="user-things-a" href="/cart">
-                <span class="icon"><img src="@/assets/icons/shopping_cart.svg"></span>
-                </RouterLink>
+                <div class="user-things" ref="favoritesMenuRef">
+                    <div class="user-things-a" @click="toggleFavoritesMenu">
+                        <span class="icon material-symbols-outlined">favorite</span>
+                    </div>
+                    <div v-if="isFavoritesMenuOpen" class="user-menu">
+                        <div v-if="authStore.getters.isAuthenticated">
+                            <h2>Favoritos</h2>
+                            <ul class="fav-ul">
+                                <li v-for="movie in favStore.state.movies.results" :key="movie.id">
+                                    <RouterLink class="fav-item" :to="`/movie/${movie.id}`">
+                                        <img :src="`${info.apiAvatar}/t/p/w500${movie.poster_path}`" alt="Movie poster">
+                                        <p>{{ movie.title }}</p>
+                                        <button @click="favStore.actions.removeMovie(authStore.getters.user.id, authStore.state.token, movie.id)">
+                                            <span class="material-symbols-outlined">delete</span>
+                                        </button>
+                                    </RouterLink>
+                                </li>
+                            </ul>
+                        </div>
+                        <div v-else>
+                            <p>Faça login para ver seus favoritos.</p>
+                        </div>
+                    </div>
+                </div>
                 <div v-if="isUserMenuOpen" class="user-menu">
-                    <div class="user" v-if="false">
+                    <div class="user" v-if="authStore.getters.isAuthenticated">
                         <div class="ur-pi">
-                            <p>{{ $page.props.auth.user.email }}</p>
-                            <img src="@/assets/icons/default_user.svg" alt="User picture">
-                            <h2>Olá, <b>{{ ft($page.props.auth.user.first_name) }}</b></h2>
+                            <img :src="(authStore.getters.user.avatar.tmdb.avatar_path) ? `${info.apiAvatar}/t/p/w500${authStore.getters.user.avatar.tmdb.avatar_path}` : defaultUser"
+                                alt="User picture">
+                            <h2>Olá, {{ authStore.getters.user.username }}</h2>
                             <div class="ur-dsh-c">
-                                <RouterLink class="ur-dsh-c-a" :href="route('dashboard.me.index')">
-                                <p>Gerenciar meu perfil</p>
+                                <RouterLink class="ur-dsh-c-a" to="/">
+                                    <p>Gerenciar meu perfil</p>
                                 </RouterLink>
                             </div>
                         </div>
                         <div class="ur-ac">
                             <div class="ur-dsh-b">
-                                <RouterLink class="ur-dsh-b-a" href="/dashboard/purchases">
-                                <span class="material-symbols-outlined">shopping_cart</span>
-                                <p>Compras</p>
-                                </RouterLink>
-                                <RouterLink class="ur-dsh-b-a" href="/dashboard/purchases">
-                                <span class="material-symbols-outlined">history</span>
-                                <p>Historico</p>
-                                </RouterLink>
-                                <RouterLink class="ur-dsh-b-a" href="/dashboard/purchases">
-                                <span class="material-symbols-outlined">help</span>
-                                <p>Perguntas</p>
-                                </RouterLink>
-                                <RouterLink class="ur-dsh-b-a" href="/dashboard/purchases">
-                                <span class="material-symbols-outlined">workspace_premium</span>
-                                <p>Opnios</p>
-                                </RouterLink>
-                                <RouterLink class="ur-dsh-b-a" href="/dashboard/me/announce">
-                                <span class="material-symbols-outlined">sell</span>
-                                <p>Vender</p>
-                                </RouterLink>
-                            </div>
-                            <div class="ur-acc">
-                                <RouterLink class="ur-acc-a" :href="route('company.create.index')">
-                                <p>Criar empresa</p>
-                                </RouterLink>
-                                <RouterLink class="ur-acc-a" method="delete" as="button" :href="route('auth.login.destroy')">
-                                <p>Sair</p>
-                                </RouterLink>
+                                <button @click="toggleFavoritesMenu" class="ur-dsh-b-a">
+                                    <span class="icon material-symbols-outlined">favorite</span>
+                                    <p>Favoritos</p>
+                                </button>
+                                <button @click="handleLogout" class="ur-dsh-b-a">
+                                    <p>Sair</p>
+                                </button>
                             </div>
                         </div>
                     </div>
                     <div class="user" v-else>
                         <div class="ur-dsh-c">
                             <div>
-                                <RouterLink class="ur-dsh-c-a" to="">
-                                <p>Fazer login</p>
-                                </RouterLink>
-                            </div>
-                            <div>
-                                <RouterLink class="ur-dsh-b-a reg" to="">
-                                <p>Criar conta</p>
-                                </RouterLink>
+                                <button @click="handleLogin" class="ur-dsh-c-a" :disabled="loginProcess">
+                                    <span v-if="loginProcess" class="loading"></span>
+                                    <p v-if="!loginProcess">Fazer login</p>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="user-picture" @click="toggleUserMenu">
-                    <img v-if="false" src="@/assets/icons/default_user.svg" alt="User picture">
+                    <img v-if="true"
+                        :src="(authStore.getters.user.avatar && authStore.getters.user.avatar.tmdb.avatar_path) ? `${info.apiAvatar}/t/p/w500${authStore.getters.user.avatar.tmdb.avatar_path}` : defaultUser"
+                        alt="User picture">
                     <span v-else class="default-icon material-symbols-outlined">person</span>
                 </div>
             </div>
@@ -146,6 +174,50 @@ onUnmounted(() => {
     </header>
 </template>
 <style scoped>
+
+.fav-ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.fav-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    text-decoration: none;
+    color: black;
+}
+
+.fav-item img {
+    height: 50px;
+    width: 35px;
+    object-fit: cover;
+}
+
+.fav-item p {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.fav-item button {
+    background-color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    height: 30px;
+    width: 30px;
+}
+
+.fav-item button:hover {
+    background-color: #E7E7E7;
+}
 
 .default-icon {
     font-variation-settings:
@@ -158,12 +230,6 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-
-}
-
-.ur-dsh-b-a.reg {
-    justify-content: center;
-    margin-top: 1rem;
 }
 
 .user {
@@ -183,9 +249,14 @@ onUnmounted(() => {
     justify-content: center;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 1rem;
     padding: 0 1rem;
     font-size: 14px;
+    cursor: pointer;
+    border: none;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    margin-bottom: 0.5rem;
 }
 
 .ur-dsh-c-a:hover {
@@ -286,7 +357,7 @@ onUnmounted(() => {
 }
 
 header {
-    background-color: black;
+    background: none;
     color: #fff;
     padding: 0.75rem 1.25rem;
     display: flex;
@@ -294,6 +365,9 @@ header {
     justify-content: space-between;
     align-items: center;
     font-family: 'Inter', sans-serif;
+    position: absolute;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .logo {
@@ -369,6 +443,15 @@ header {
     gap: 1rem;
     align-items: center;
     flex: 1;
+    justify-content: flex-end;
+}
+
+.akd-ds-nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex: 1;
+    justify-content: flex-start;
 }
 
 .icon p {
@@ -383,7 +466,6 @@ header {
     background-color: white;
     border-radius: 7px;
     height: 40px;
-    flex: 1;
     overflow: hidden;
     max-width: 800px;
 }
@@ -448,7 +530,6 @@ header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
 }
 
 .ur-pi img {
@@ -470,6 +551,27 @@ header {
 .ur-pi h2 {
     font-size: 20px;
     font-weight: 500;
+}
+
+.loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @media screen and (max-width: 1200px) {

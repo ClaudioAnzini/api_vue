@@ -1,11 +1,11 @@
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import auth from '../services/auth'
 import { defineStore } from 'pinia'
 
 export const useAuthStore = defineStore('auth', () => {
     const state = {
         token: ref(localStorage.getItem('token') || ''),
-        user: ref({}),
+        user: ref(JSON.parse(localStorage.getItem('user')) || {}),
     }
     const mutations = {
         setToken: async (token) => {
@@ -16,10 +16,12 @@ export const useAuthStore = defineStore('auth', () => {
             state.token.value = ''
             state.user.value = {}
             localStorage.removeItem('token')
+            localStorage.removeItem('user')
         },
         updateUser: async () => {
             try {
                 state.user.value = await auth.getUser(state.token.value)
+                localStorage.setItem('user', JSON.stringify(state.user.value))
             } catch (error) {
                 alert('Não foi possível atualizar o usuário: ' + error)
                 await mutations.logout()
@@ -48,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
         }),
         user: computed(() => state.user.value),
     }
-
+    
     if (state.token) {
         mutations.updateUser()
     }
